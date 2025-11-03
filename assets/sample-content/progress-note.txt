@@ -1,0 +1,31 @@
+PROGRESS NOTE
+
+Date: [Current Date]
+Patient: [Patient Name]
+MRN: [Patient ID]
+Provider: [Provider Name]
+
+SUBJECTIVE:
+Patient reports [current symptoms/concerns]. Overall feeling [better/worse/stable] since last visit.
+Pain level: [scale]/10
+Sleep: [quality]
+Appetite: [status]
+
+OBJECTIVE:
+Vital Signs: BP [value], HR [value], RR [value], Temp [value], O2 Sat [value]%
+Weight: [value] lbs
+General appearance: [observation]
+
+ASSESSMENT:
+1. [Diagnosis/Problem 1] - [Status: stable/improving/worsening]
+2. [Diagnosis/Problem 2] - [Status]
+
+PLAN:
+1. Continue current medications
+2. [Any medication changes]
+3. [Ordered tests/procedures]
+4. Patient education provided regarding [topics]
+5. Follow-up appointment scheduled for [date/timeframe]
+
+[Provider Name], [Credentials]
+[Date and Time]

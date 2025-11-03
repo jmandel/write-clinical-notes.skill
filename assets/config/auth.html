@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FHIR SMART Setup</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background: #f5f5f5;
+    }
+    .auto-save-notice {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #4CAF50;
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      animation: slideIn 0.3s ease-out;
+      z-index: 1000;
+    }
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    .config-card {
+      background: white;
+      padding: 1rem;
+      margin: 0.5rem 0;
+      border-radius: 4px;
+      border: 2px solid #e0e0e0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .config-card:hover {
+      border-color: #2196F3;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .config-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .config-card-name {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .config-card-url {
+      font-size: 12px;
+      color: #666;
+      margin-top: 0.5rem;
+      font-family: monospace;
+    }
+    .delete-btn {
+      background: #f44336;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .delete-btn:hover {
+      background: #d32f2f;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const CALLBACK_URL = window.location.origin + window.location.pathname;
+
+    function AuthHelper() {
+      const [view, setView] = useState('home'); // 'home', 'new-config', 'config', 'auth', 'complete'
+      const [existingConfigs, setExistingConfigs] = useState([]);
+      const [config, setConfig] = useState({
+        name: '',
+        fhirBaseUrl: '',
+        mode: 'manual',
+      });
+      const [authCode, setAuthCode] = useState('');
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+      const [saved, setSaved] = useState(false);
+
+      useEffect(() => {
+        loadExistingConfigs();
+
+        // Check for auth code in URL (OAuth callback)
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        if (code) {
+          setAuthCode(code);
+          setView('auth');
+
+          // Restore configuration from sessionStorage
+          const savedConfig = sessionStorage.getItem('oauth_config');
+          if (savedConfig) {
+            setConfig(JSON.parse(savedConfig));
+          }
+        }
+      }, []);
+
+      const loadExistingConfigs = async () => {
+        try {
+          const response = await fetch('/list-configs');
+          if (response.ok) {
+            const configs = await response.json();
+            setExistingConfigs(configs);
+          }
+        } catch (err) {
+          console.error('Failed to load configs:', err);
+        }
+      };
+
+      const selectConfig = async (configName) => {
+        try {
+          setLoading(true);
+          const response = await fetch('/select-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: configName })
+          });
+
+          if (response.ok) {
+            setSaved(true);
+            setView('selected');
+          }
+        } catch (err) {
+          setError('Failed to select config: ' + err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const reauthorizeConfig = async (cfg, e) => {
+        e.stopPropagation();
+
+        // Load the existing config with all saved OAuth details
+        const reloadedConfig = {
+          name: cfg.name,
+          fhirBaseUrl: cfg.fhirBaseUrl,
+          mode: cfg.mode,
+          authEndpoint: cfg.authEndpoint,
+          tokenEndpoint: cfg.tokenEndpoint,
+          clientId: cfg.clientId,
+          clientSecret: cfg.clientSecret,
+          scope: cfg.scope || 'patient/DocumentReference.c patient/DocumentReference.u patient/Patient.rs launch/patient',
+          patientId: cfg.patientId,
+          encounterRef: cfg.encounterRef,
+          isReauthorizing: true
+        };
+
+        // For OAuth modes, go straight to OAuth flow without showing form
+        if (cfg.mode === 'public' || cfg.mode === 'confidential') {
+          if (!cfg.authEndpoint || !cfg.tokenEndpoint || !cfg.clientId) {
+            // Missing critical data, need to show form
+            setConfig(reloadedConfig);
+            setView('new-config');
+            if (cfg.fhirBaseUrl && !cfg.authEndpoint) {
+              await discoverEndpoints(cfg.fhirBaseUrl);
+            }
+          } else {
+            // Have everything needed, start OAuth immediately
+            // Save to sessionStorage first so it survives the redirect
+            sessionStorage.setItem('oauth_config', JSON.stringify(reloadedConfig));
+
+            const scope = reloadedConfig.scope || 'patient/DocumentReference.c patient/DocumentReference.u patient/Patient.rs launch/patient';
+            const state = Math.random().toString(36).substring(7);
+            sessionStorage.setItem('oauth_state', state);
+
+            const authUrl = new URL(reloadedConfig.authEndpoint);
+            authUrl.searchParams.set('response_type', 'code');
+            authUrl.searchParams.set('client_id', reloadedConfig.clientId);
+            authUrl.searchParams.set('redirect_uri', CALLBACK_URL);
+            authUrl.searchParams.set('scope', scope);
+            authUrl.searchParams.set('state', state);
+            authUrl.searchParams.set('aud', reloadedConfig.fhirBaseUrl);
+
+            window.location.href = authUrl.toString();
+          }
+        } else {
+          // For manual mode, show the form
+          setConfig(reloadedConfig);
+          setView('new-config');
+        }
+      };
+
+      const forkConfig = (cfg, e) => {
+        e.stopPropagation();
+
+        // Create a copy with a new name prompt
+        const newName = prompt(`Enter a name for the forked configuration:`, `${cfg.name} (copy)`);
+        if (!newName) return;
+
+        setConfig({
+          name: newName,
+          fhirBaseUrl: cfg.fhirBaseUrl,
+          mode: cfg.mode,
+          authEndpoint: cfg.authEndpoint,
+          tokenEndpoint: cfg.tokenEndpoint,
+          clientId: cfg.clientId,
+          clientSecret: cfg.clientSecret,
+          scope: cfg.scope || 'patient/DocumentReference.c patient/DocumentReference.u patient/Patient.rs launch/patient',
+          patientId: cfg.patientId,
+          encounterRef: cfg.encounterRef,
+          isFork: true
+        });
+
+        setView('new-config');
+      };
+
+      const deleteConfig = async (configName, e) => {
+        e.stopPropagation();
+        if (!confirm(`Delete configuration "${configName}"?`)) return;
+
+        try {
+          const response = await fetch('/delete-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: configName })
+          });
+
+          if (response.ok) {
+            loadExistingConfigs();
+          }
+        } catch (err) {
+          setError('Failed to delete config: ' + err.message);
+        }
+      };
+
+      // Auto-save when config is complete
+      useEffect(() => {
+        if (view === 'complete' && config.accessToken && config.name && !saved) {
+          saveConfig();
+        }
+      }, [view, config.accessToken, config.name, saved]);
+
+      const saveConfig = async () => {
+        const exportData = {
+          name: config.name,
+          fhirBaseUrl: config.fhirBaseUrl,
+          accessToken: config.accessToken,
+          patientId: config.patientId,
+          encounterRef: config.encounterRef,
+          mode: config.mode,
+          // Save OAuth configuration so re-auth can reuse it
+          authEndpoint: config.authEndpoint,
+          tokenEndpoint: config.tokenEndpoint,
+          clientId: config.clientId,
+          clientSecret: config.clientSecret,
+          scope: config.scope,
+        };
+
+        try {
+          const response = await fetch('/save-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(exportData)
+          });
+
+          if (response.ok) {
+            setSaved(true);
+          } else {
+            const data = await response.json();
+            setError('Failed to save: ' + (data.error || 'Unknown error'));
+          }
+        } catch (err) {
+          setError('Error saving config: ' + err.message);
+        }
+      };
+
+      const discoverEndpoints = async (fhirBaseUrl) => {
+        try {
+          setLoading(true);
+          setError('');
+
+          const metadataUrl = fhirBaseUrl.replace(/\/$/, '') + '/metadata';
+          const response = await fetch(metadataUrl);
+          const metadata = await response.json();
+
+          const smartExtension = metadata.rest?.[0]?.security?.extension?.find(
+            (ext) => ext.url === 'http://fhir-registry.smarthealthit.org/StructureDefinition/oauth-uris'
+          );
+
+          if (smartExtension) {
+            const authExt = smartExtension.extension.find((e) => e.url === 'authorize');
+            const tokenExt = smartExtension.extension.find((e) => e.url === 'token');
+
+            setConfig(prev => ({
+              ...prev,
+              authEndpoint: authExt?.valueUri || '',
+              tokenEndpoint: tokenExt?.valueUri || '',
+            }));
+          }
+        } catch (err) {
+          setError('Failed to discover SMART endpoints: ' + err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const startOAuth = () => {
+        if (!config.authEndpoint || !config.clientId) {
+          setError('Missing authorization endpoint or client ID');
+          return;
+        }
+
+        const scope = config.scope || 'patient/DocumentReference.c patient/DocumentReference.u patient/Patient.rs launch/patient';
+        const state = Math.random().toString(36).substring(7);
+        sessionStorage.setItem('oauth_state', state);
+
+        // Save entire config to sessionStorage so it survives the redirect
+        sessionStorage.setItem('oauth_config', JSON.stringify(config));
+
+        const authUrl = new URL(config.authEndpoint);
+        authUrl.searchParams.set('response_type', 'code');
+        authUrl.searchParams.set('client_id', config.clientId);
+        authUrl.searchParams.set('redirect_uri', CALLBACK_URL);
+        authUrl.searchParams.set('scope', scope);
+        authUrl.searchParams.set('state', state);
+        authUrl.searchParams.set('aud', config.fhirBaseUrl);
+
+        window.location.href = authUrl.toString();
+      };
+
+      const exchangeCodeForToken = async () => {
+        if (!config.tokenEndpoint || !config.clientId) {
+          setError('Missing token endpoint or client ID');
+          return;
+        }
+
+        try {
+          setLoading(true);
+          setError('');
+
+          const body = new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: authCode,
+            redirect_uri: CALLBACK_URL,
+            client_id: config.clientId,
+          });
+
+          if (config.mode === 'confidential' && config.clientSecret) {
+            body.append('client_secret', config.clientSecret);
+          }
+
+          const response = await fetch(config.tokenEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: body.toString(),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.text();
+            throw new Error(`Token exchange failed: ${errorData}`);
+          }
+
+          const tokenData = await response.json();
+
+          setConfig(prev => ({
+            ...prev,
+            accessToken: tokenData.access_token,
+            patientId: tokenData.patient,
+            name: sessionStorage.getItem('config_name') || prev.name
+          }));
+
+          setView('complete');
+        } catch (err) {
+          setError('Token exchange failed: ' + err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // HOME VIEW
+      if (view === 'home') {
+        return (
+          <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '2rem', fontFamily: 'system-ui' }}>
+            <h1>🏥 FHIR SMART Setup</h1>
+            <p>Manage your FHIR server configurations for testing.</p>
+
+            {error && (
+              <div style={{ background: '#ffebee', padding: '1rem', borderRadius: '4px', marginBottom: '1rem', color: '#c62828' }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '2rem' }}>
+              <button
+                onClick={() => setView('new-config')}
+                style={{
+                  padding: '1rem 2rem',
+                  fontSize: '16px',
+                  background: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  width: '100%'
+                }}
+              >
+                ➕ Create New Configuration
+              </button>
+            </div>
+
+            {existingConfigs.length > 0 && (
+              <div>
+                <h2>Existing Configurations</h2>
+                <p>Click to set as active configuration:</p>
+
+                {existingConfigs.map(cfg => (
+                  <div
+                    key={cfg.name}
+                    className="config-card"
+                    onClick={() => selectConfig(cfg.name)}
+                  >
+                    <div className="config-card-header">
+                      <div>
+                        <div className="config-card-name">{cfg.name}</div>
+                        <div style={{ fontSize: '14px', color: '#666', marginTop: '0.25rem' }}>
+                          Mode: {cfg.mode || 'unknown'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {(cfg.mode === 'public' || cfg.mode === 'confidential' || cfg.mode === 'manual') && (
+                          <button
+                            style={{
+                              background: '#FF9800',
+                              color: 'white',
+                              border: 'none',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '14px'
+                            }}
+                            onClick={(e) => reauthorizeConfig(cfg, e)}
+                          >
+                            🔄 Re-auth
+                          </button>
+                        )}
+                        <button
+                          style={{
+                            background: '#2196F3',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.5rem 1rem',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                          }}
+                          onClick={(e) => forkConfig(cfg, e)}
+                        >
+                          🍴 Fork
+                        </button>
+                        <button
+                          className="delete-btn"
+                          onClick={(e) => deleteConfig(cfg.name, e)}
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
+                    </div>
+                    <div className="config-card-url">
+                      {cfg.fhirBaseUrl}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#999', marginTop: '0.5rem' }}>
+                      Saved: {new Date(cfg.savedAt).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {existingConfigs.length === 0 && (
+              <div style={{ padding: '2rem', textAlign: 'center', background: '#f5f5f5', borderRadius: '4px' }}>
+                <p style={{ color: '#666' }}>No configurations yet. Create your first one!</p>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // SELECTED CONFIG VIEW
+      if (view === 'selected') {
+        return (
+          <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '2rem', fontFamily: 'system-ui' }}>
+            <div className="auto-save-notice">
+              ✅ Configuration activated! Setup will complete automatically.
+            </div>
+
+            <h1>✅ Configuration Activated</h1>
+            <div style={{ background: '#e8f5e9', padding: '1.5rem', borderRadius: '4px', marginTop: '2rem' }}>
+              <p style={{ fontSize: '18px', margin: 0 }}>
+                <strong>The selected configuration is now active.</strong>
+              </p>
+              <p style={{ marginTop: '1rem', marginBottom: 0 }}>
+                The setup script will exit shortly. You can close this browser window.
+              </p>
+            </div>
+          </div>
+        );
+      }
+
+      // COMPLETE VIEW
+      if (view === 'complete') {
+        return (
+          <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '2rem', fontFamily: 'system-ui' }}>
+            {saved && (
+              <div className="auto-save-notice">
+                ✅ Configuration saved! Setup will complete automatically.
+              </div>
+            )}
+
+            <h1>✅ Configuration Complete</h1>
+
+            <div style={{ background: '#e8f5e9', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>
+              <h3>Configuration Name</h3>
+              <p style={{ fontFamily: 'monospace', fontSize: '16px' }}>{config.name}</p>
+            </div>
+
+            <div style={{ background: '#e3f2fd', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>
+              <h3>Access Token Obtained</h3>
+              <p style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                {config.accessToken?.substring(0, 40)}...
+              </p>
+            </div>
+
+            {config.patientId && (
+              <div style={{ background: '#fff3e0', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>
+                <h3>Patient Context</h3>
+                <p><strong>Patient ID:</strong> {config.patientId}</p>
+              </div>
+            )}
+
+            <div style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>
+              <h3>FHIR Base URL</h3>
+              <p style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{config.fhirBaseUrl}</p>
+            </div>
+
+            <div style={{ marginTop: '2rem', padding: '1rem', background: '#e3f2fd', borderRadius: '4px' }}>
+              <p><strong>✨ The configuration has been automatically saved.</strong></p>
+              <p>The setup script will exit shortly, and you can close this browser window.</p>
+            </div>
+          </div>
+        );
+      }
+
+      // AUTH CODE EXCHANGE VIEW
+      if (view === 'auth' && authCode) {
+        return (
+          <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '2rem', fontFamily: 'system-ui' }}>
+            <h1>🔐 Authorization Code Received</h1>
+
+            <div style={{ background: '#e8f5e9', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>
+              <h3>Code</h3>
+              <p style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{authCode}</p>
+            </div>
+
+            {error && (
+              <div style={{ background: '#ffebee', padding: '1rem', borderRadius: '4px', marginBottom: '1rem', color: '#c62828' }}>
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={exchangeCodeForToken}
+              disabled={loading}
+              style={{
+                padding: '1rem 2rem',
+                fontSize: '16px',
+                background: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1
+              }}
+            >
+              {loading ? '⏳ Exchanging...' : '🔄 Exchange Code for Token'}
+            </button>
+          </div>
+        );
+      }
+
+      // NEW CONFIG VIEW
+      return (
+        <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '2rem', fontFamily: 'system-ui' }}>
+          <button
+            onClick={() => setView('home')}
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '14px',
+              background: '#f5f5f5',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              marginBottom: '1rem'
+            }}
+          >
+            ← Back to Home
+          </button>
+
+          <h1>{config.isReauthorizing ? `Re-authorize: ${config.name}` : 'Create New FHIR Configuration'}</h1>
+
+          {error && (
+            <div style={{ background: '#ffebee', padding: '1rem', borderRadius: '4px', marginBottom: '1rem', color: '#c62828' }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Configuration Name *
+            </label>
+            <input
+              type="text"
+              value={config.name}
+              onChange={(e) => setConfig({ ...config, name: e.target.value })}
+              placeholder="e.g., smart-health-it, epic-sandbox, local-dev"
+              style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+            />
+            <div style={{ fontSize: '12px', color: '#666', marginTop: '0.25rem' }}>
+              Give this configuration a memorable name
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Authentication Mode
+            </label>
+            <select
+              value={config.mode}
+              onChange={(e) => setConfig({ ...config, mode: e.target.value })}
+              style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+            >
+              <option value="manual">Manual (Paste Token)</option>
+              <option value="open">Open Server (No Auth)</option>
+              <option value="public">OAuth Public Client</option>
+              <option value="confidential">OAuth Confidential Client</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              FHIR Base URL *
+            </label>
+            <input
+              type="text"
+              value={config.fhirBaseUrl}
+              onChange={(e) => {
+                const newUrl = e.target.value;
+                setConfig({ ...config, fhirBaseUrl: newUrl });
+
+                // Auto-discover endpoints when URL changes (for OAuth modes)
+                if (config.mode !== 'manual' && config.mode !== 'open' && newUrl && newUrl.startsWith('http')) {
+                  // Debounce the discovery to avoid too many requests
+                  clearTimeout(window.discoveryTimeout);
+                  window.discoveryTimeout = setTimeout(() => {
+                    discoverEndpoints(newUrl);
+                  }, 500);
+                }
+              }}
+              placeholder="https://fhir.example.org/r4"
+              style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+            />
+            {config.mode !== 'manual' && config.mode !== 'open' && loading && (
+              <div style={{ marginTop: '0.5rem', fontSize: '14px', color: '#666' }}>
+                ⏳ Auto-discovering SMART endpoints...
+              </div>
+            )}
+          </div>
+
+          {config.mode === 'open' && (
+            <>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Patient ID (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={config.patientId || ''}
+                  onChange={(e) => setConfig({ ...config, patientId: e.target.value })}
+                  placeholder="patient-123"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Encounter Reference (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={config.encounterRef || ''}
+                  onChange={(e) => setConfig({ ...config, encounterRef: e.target.value })}
+                  placeholder="Encounter/enc-456"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+                />
+              </div>
+
+              <button
+                onClick={() => {
+                  setConfig({ ...config, accessToken: 'OPEN_SERVER' });
+                  setView('complete');
+                }}
+                disabled={!config.fhirBaseUrl || !config.name}
+                style={{
+                  padding: '1rem 2rem',
+                  fontSize: '16px',
+                  background: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: (!config.fhirBaseUrl || !config.name) ? 'not-allowed' : 'pointer',
+                  opacity: (!config.fhirBaseUrl || !config.name) ? 0.6 : 1
+                }}
+              >
+                ✓ Use Open Server
+              </button>
+            </>
+          )}
+
+          {config.mode === 'manual' && (
+            <>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Access Token *
+                </label>
+                <textarea
+                  value={config.accessToken || ''}
+                  onChange={(e) => setConfig({ ...config, accessToken: e.target.value })}
+                  placeholder="Paste your access token here"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '16px', minHeight: '100px' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Patient ID (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={config.patientId || ''}
+                  onChange={(e) => setConfig({ ...config, patientId: e.target.value })}
+                  placeholder="patient-123"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Encounter Reference (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={config.encounterRef || ''}
+                  onChange={(e) => setConfig({ ...config, encounterRef: e.target.value })}
+                  placeholder="Encounter/enc-456"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+                />
+              </div>
+
+              <button
+                onClick={() => { setView('complete'); }}
+                disabled={!config.fhirBaseUrl || !config.accessToken || !config.name}
+                style={{
+                  padding: '1rem 2rem',
+                  fontSize: '16px',
+                  background: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: (!config.fhirBaseUrl || !config.accessToken || !config.name) ? 'not-allowed' : 'pointer',
+                  opacity: (!config.fhirBaseUrl || !config.accessToken || !config.name) ? 0.6 : 1
+                }}
+              >
+                ✓ Save Configuration
+              </button>
+            </>
+          )}
+
+          {config.mode !== 'manual' && config.mode !== 'open' && (
+            <>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Scope
+                </label>
+                <input
+                  type="text"
+                  value={config.scope || 'patient/DocumentReference.c patient/DocumentReference.u patient/Patient.rs launch/patient'}
+                  onChange={(e) => setConfig({ ...config, scope: e.target.value })}
+                  placeholder="patient/DocumentReference.c patient/DocumentReference.u patient/Patient.rs launch/patient"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+                />
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '0.25rem' }}>
+                  Space-separated SMART scopes
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Authorization Endpoint
+                </label>
+                <input
+                  type="text"
+                  value={config.authEndpoint || ''}
+                  onChange={(e) => setConfig({ ...config, authEndpoint: e.target.value })}
+                  placeholder="https://auth.example.org/authorize"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Token Endpoint
+                </label>
+                <input
+                  type="text"
+                  value={config.tokenEndpoint || ''}
+                  onChange={(e) => setConfig({ ...config, tokenEndpoint: e.target.value })}
+                  placeholder="https://auth.example.org/token"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Client ID
+                </label>
+                <input
+                  type="text"
+                  value={config.clientId || ''}
+                  onChange={(e) => setConfig({ ...config, clientId: e.target.value })}
+                  placeholder="my-client-id"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+                />
+              </div>
+
+              {config.mode === 'confidential' && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                    Client Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={config.clientSecret || ''}
+                    onChange={(e) => setConfig({ ...config, clientSecret: e.target.value })}
+                    placeholder="my-client-secret"
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '16px' }}
+                  />
+                </div>
+              )}
+
+              <button
+                onClick={startOAuth}
+                disabled={!config.authEndpoint || !config.clientId || !config.name}
+                style={{
+                  padding: '1rem 2rem',
+                  fontSize: '16px',
+                  background: '#2196F3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: (!config.authEndpoint || !config.clientId || !config.name) ? 'not-allowed' : 'pointer',
+                  opacity: (!config.authEndpoint || !config.clientId || !config.name) ? 0.6 : 1
+                }}
+              >
+                🚀 Start OAuth Flow
+              </button>
+            </>
+          )}
+
+          <div style={{ marginTop: '2rem', padding: '1rem', background: '#f5f5f5', borderRadius: '4px' }}>
+            <h4>Instructions:</h4>
+            <ul>
+              <li><strong>Manual:</strong> Paste an existing access token</li>
+              <li><strong>Open Server:</strong> No authentication required</li>
+              <li><strong>Public Client:</strong> Standard OAuth flow without client secret</li>
+              <li><strong>Confidential Client:</strong> OAuth flow with client secret</li>
+            </ul>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<AuthHelper />);
+  </script>
+</body>
+</html>

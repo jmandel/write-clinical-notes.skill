@@ -1,0 +1,13 @@
+{
+  "name": "fhir-smart-setup",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SMART on FHIR setup helper with button script",
+  "scripts": {
+    "setup": "bun setup.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  }
+}

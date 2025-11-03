@@ -1,0 +1,5 @@
+# FHIR Testing configurations and debug logs
+# Copy this file to your project root to exclude sensitive configs and debug output
+.fhir-configs/
+debug/
+localized/

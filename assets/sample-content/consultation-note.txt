@@ -1,0 +1,37 @@
+CONSULTATION NOTE
+
+Date: [Current Date]
+Patient: [Patient Name]
+MRN: [Patient ID]
+
+REASON FOR CONSULTATION:
+Patient referred for evaluation of [condition/symptom].
+
+HISTORY OF PRESENT ILLNESS:
+[Patient Name] is a [age]-year-old [gender] presenting with [chief complaint]. 
+Symptoms began approximately [timeframe] ago. Patient reports [key symptoms and their characteristics].
+
+PAST MEDICAL HISTORY:
+- [Relevant conditions]
+
+MEDICATIONS:
+- [Current medications]
+
+PHYSICAL EXAMINATION:
+Vital Signs: BP [value], HR [value], RR [value], Temp [value]
+General: [Appearance and general condition]
+[Relevant system examinations]
+
+ASSESSMENT:
+[Clinical impressions and diagnoses]
+
+RECOMMENDATIONS:
+1. [Recommendation 1]
+2. [Recommendation 2]
+3. Follow-up in [timeframe]
+
+Thank you for this consultation. Please contact me if you have any questions.
+
+[Provider Name]
+[Provider Title]
+[Date and Time]

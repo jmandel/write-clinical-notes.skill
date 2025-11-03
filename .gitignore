@@ -1,0 +1,16 @@
+# FHIR configuration with sensitive credentials
+.fhir-config.json
+.fhir-configs/
+
+# Node modules
+node_modules/
+assets/node_modules/
+
+# NPM
+package-lock.json
+assets/package-lock.json
+
+# Build artifacts
+*.log
+dist/
+build/
