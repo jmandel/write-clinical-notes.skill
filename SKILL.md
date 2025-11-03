@@ -309,10 +309,28 @@ Templates are located in `assets/templates/` with placeholder variables:
 
 ### Available Templates
 
-1. **consultation-note.json** - Provider consultation with resolvable encounter
-2. **progress-note.json** - Provider progress note with contained encounter
-3. **discharge-summary.json** - Hospital discharge summary
-4. **patient-asserted-note.json** - Patient-authored health log
+**Text/Plain (required by spec):**
+1. **consultation-note.json** - Provider consultation with resolvable encounter (text/plain; charset=utf-8)
+2. **progress-note.json** - Provider progress note with contained encounter (text/plain; charset=utf-8)
+3. **discharge-summary.json** - Hospital discharge summary (text/plain; charset=utf-8)
+
+**PDF (required by spec):**
+4. **consultation-note-pdf.json** - Consultation note in PDF format (application/pdf)
+
+**CDA (C-CDA proper format):**
+5. **discharge-summary-cda-xml.json** - C-CDA structured discharge summary (application/cda+xml)
+
+**XHTML Rich Text (should support per spec):**
+6. **discharge-summary-xhtml.json** - Discharge summary in XHTML format (application/xhtml+xml)
+
+**HTML Rich Text:**
+7. **progress-note-html.json** - Progress note with HTML formatting (text/html; charset=utf-8)
+
+**Patient-Asserted:**
+8. **patient-asserted-note.json** - Patient-authored health log with PATAST security tag
+
+**Size Limit Testing:**
+9. **large-note.json** - Tests 5 MiB size requirement (generated programmatically)
 
 ### Placeholder Variables
 
@@ -396,12 +414,32 @@ This keeps each server's localized resources separate and organized.
 
 ### Sample Content Files
 
-Use these as starting points or customize:
-- `assets/sample-content/consultation-note.txt`
-- `assets/sample-content/progress-note.txt`
-- `assets/sample-content/patient-log.txt`
+The skill includes generator scripts for different content types. Run these from the skill's `assets/sample-content/` directory:
 
-For PDF content, generate a simple PDF or use existing test files.
+**Text Files (pre-created):**
+- `consultation-note.txt` - Plain text consultation note
+- `progress-note.txt` - Plain text progress note
+- `patient-log.txt` - Patient-authored health log
+
+**Generated Content (run these scripts as needed):**
+- `bun generate-pdf.ts` - Creates `consultation-note.pdf` (minimal valid PDF)
+- `bun generate-cda-xml.ts` - Creates `discharge-summary.cda.xml` (proper HL7 C-CDA with structured body)
+- `bun generate-xhtml.ts` - Creates `discharge-summary.xhtml` (XHTML rich text, NOT CDA)
+- `bun generate-html.ts` - Creates `progress-note.html` (HTML with rich formatting)
+- `bun generate-large-file.ts` - Creates `large-note.txt` (~5 MiB text file)
+
+**Why generate programmatically?**
+- Keeps repository size small
+- Ensures fresh, customizable test content
+- Easy to modify for specific testing needs
+- Avoids committing large binary files
+
+**Example usage:**
+```bash
+cd .claude/skills/fhir-connectathon-notes/assets/sample-content
+bun generate-pdf.ts
+# Creates consultation-note.pdf in current directory
+```
 
 ## Test Scenario Execution
 

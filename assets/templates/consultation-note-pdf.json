@@ -1,0 +1,65 @@
+{
+  "resourceType": "DocumentReference",
+  "identifier": [
+    {
+      "system": "{{IDENTIFIER_SYSTEM}}",
+      "value": "{{IDENTIFIER_VALUE}}"
+    }
+  ],
+  "status": "current",
+  "type": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "11488-4",
+        "display": "Consultation note"
+      }
+    ]
+  },
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://hl7.org/fhir/us/core/CodeSystem/us-core-documentreference-category",
+          "code": "clinical-note"
+        }
+      ]
+    }
+  ],
+  "subject": {
+    "reference": "Patient/{{PATIENT_ID}}",
+    "display": "{{PATIENT_NAME}}"
+  },
+  "author": [
+    {
+      "reference": "{{AUTHOR_REFERENCE}}",
+      "display": "{{AUTHOR_DISPLAY}}"
+    }
+  ],
+  "date": "{{CURRENT_TIMESTAMP}}",
+  "content": [
+    {
+      "attachment": {
+        "contentType": "application/pdf",
+        "data": "{{BASE64_CONTENT}}",
+        "size": {{CONTENT_SIZE}}
+      },
+      "format": {
+        "system": "http://ihe.net/fhir/ValueSet/IHE.FormatCode.codesystem",
+        "code": "urn:ihe:iti:xds:2017:mimeTypeSufficient"
+      }
+    }
+  ],
+  "context": {
+    "encounter": [
+      {
+        "reference": "{{ENCOUNTER_REFERENCE}}",
+        "display": "{{ENCOUNTER_DISPLAY}}"
+      }
+    ],
+    "period": {
+      "start": "{{PERIOD_START}}",
+      "end": "{{PERIOD_END}}"
+    }
+  }
+}

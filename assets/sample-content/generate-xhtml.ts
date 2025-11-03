@@ -1,0 +1,165 @@
+import { writeFileSync } from 'fs';
+
+/**
+ * Generate an XHTML-formatted clinical document for testing.
+ * This is NOT a proper CDA document - it's just rich text in XHTML format.
+ * Think of it as a styled clinical document, similar to HTML but with XML structure.
+ */
+function generateXHTML() {
+  const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Hospital Discharge Summary</title>
+    <style type="text/css">
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #003366; border-bottom: 2px solid #003366; }
+        h2 { color: #0066cc; margin-top: 20px; }
+        .section { margin-bottom: 20px; }
+        .label { font-weight: bold; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Hospital Discharge Summary</h1>
+
+    <div class="section">
+        <h2>Patient Information</h2>
+        <p><span class="label">Name:</span> [Patient Name]</p>
+        <p><span class="label">MRN:</span> [Medical Record Number]</p>
+        <p><span class="label">Date of Birth:</span> [DOB]</p>
+        <p><span class="label">Admission Date:</span> January 10, 2025</p>
+        <p><span class="label">Discharge Date:</span> January 15, 2025</p>
+    </div>
+
+    <div class="section">
+        <h2>Admission Diagnosis</h2>
+        <p>Acute exacerbation of chronic obstructive pulmonary disease (COPD)</p>
+    </div>
+
+    <div class="section">
+        <h2>Discharge Diagnosis</h2>
+        <ol>
+            <li>Acute exacerbation of COPD, resolved</li>
+            <li>Type 2 Diabetes Mellitus, stable</li>
+            <li>Hypertension, controlled</li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>Hospital Course</h2>
+        <p>
+            The patient was admitted through the emergency department with shortness of breath
+            and increased sputum production. Initial chest X-ray showed hyperinflation consistent
+            with COPD but no acute infiltrate. The patient was started on supplemental oxygen,
+            bronchodilators, and a steroid taper.
+        </p>
+        <p>
+            By hospital day 3, the patient showed significant improvement in respiratory status
+            with decreased oxygen requirement. Patient was able to ambulate without dyspnea and
+            oxygen saturation remained above 92% on room air.
+        </p>
+    </div>
+
+    <div class="section">
+        <h2>Procedures Performed</h2>
+        <ul>
+            <li>Chest X-ray (portable)</li>
+            <li>Complete blood count</li>
+            <li>Comprehensive metabolic panel</li>
+            <li>Arterial blood gas</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Discharge Medications</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Medication</th>
+                    <th>Dose</th>
+                    <th>Frequency</th>
+                    <th>Instructions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Albuterol Inhaler</td>
+                    <td>90 mcg</td>
+                    <td>2 puffs every 4-6 hours</td>
+                    <td>As needed for shortness of breath</td>
+                </tr>
+                <tr>
+                    <td>Tiotropium</td>
+                    <td>18 mcg</td>
+                    <td>Once daily</td>
+                    <td>Use in the morning</td>
+                </tr>
+                <tr>
+                    <td>Prednisone</td>
+                    <td>40 mg</td>
+                    <td>Once daily</td>
+                    <td>Taper over 5 days as directed</td>
+                </tr>
+                <tr>
+                    <td>Metformin</td>
+                    <td>1000 mg</td>
+                    <td>Twice daily</td>
+                    <td>Take with meals</td>
+                </tr>
+                <tr>
+                    <td>Lisinopril</td>
+                    <td>10 mg</td>
+                    <td>Once daily</td>
+                    <td>Take in the morning</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Discharge Instructions</h2>
+        <ol>
+            <li>Continue all medications as prescribed</li>
+            <li>Use incentive spirometry 10 times every hour while awake</li>
+            <li>Avoid smoking and secondhand smoke exposure</li>
+            <li>Follow up with primary care physician within 1 week</li>
+            <li>Follow up with pulmonologist within 2 weeks</li>
+            <li>Return to emergency department if experiencing worsening shortness of breath,
+                chest pain, or fever greater than 101°F</li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>Follow-up Appointments</h2>
+        <p><span class="label">Primary Care:</span> Dr. [PCP Name] - January 22, 2025 at 10:00 AM</p>
+        <p><span class="label">Pulmonology:</span> Dr. [Pulmonologist Name] - January 29, 2025 at 2:00 PM</p>
+    </div>
+
+    <div class="section">
+        <h2>Activity Level</h2>
+        <p>Resume normal activities as tolerated. Avoid strenuous activity for 1 week.</p>
+    </div>
+
+    <div class="section">
+        <h2>Diet</h2>
+        <p>Regular diet. Continue diabetic diet with carbohydrate counting.</p>
+    </div>
+
+    <hr/>
+    <p>
+        <span class="label">Attending Physician:</span> [Provider Name], MD<br/>
+        <span class="label">Date:</span> January 15, 2025<br/>
+        <span class="label">Electronic Signature:</span> [Signature]
+    </p>
+</body>
+</html>`;
+
+  writeFileSync('discharge-summary.xhtml', xhtml);
+  console.log('✓ Generated discharge-summary.xhtml (XHTML rich text, NOT CDA)');
+}
+
+generateXHTML();
