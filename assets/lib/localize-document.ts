@@ -8,13 +8,14 @@
  *   bun localize-document.ts --type=html --patient-id=abc --patient-name="John Doe" --server=epic
  *
  * Available types:
- *   - plaintext (progress note)
- *   - pdf
- *   - cda (proper C-CDA XML)
- *   - xhtml (XHTML rich text)
- *   - html (HTML rich text)
- *   - large (5+ MiB test)
- *   - patient-asserted
+ *   - consultation (plaintext consultation note)
+ *   - progress (plaintext progress note)
+ *   - pdf (generated consultation note PDF)
+ *   - cda (generated proper C-CDA XML)
+ *   - xhtml (generated XHTML rich text)
+ *   - html (generated HTML rich text)
+ *   - large (generated 5+ MiB test)
+ *   - patient-asserted (plaintext patient log)
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -43,7 +44,13 @@ interface TemplateMapping {
 }
 
 const TEMPLATE_MAPPINGS: Record<string, TemplateMapping> = {
-  plaintext: {
+  consultation: {
+    template: 'consultation-note.json',
+    contentFile: 'consultation-note.txt',
+    contentType: 'text/plain; charset=utf-8',
+    noteType: 'Consultation note'
+  },
+  progress: {
     template: 'progress-note.json',
     contentFile: 'progress-note.txt',
     contentType: 'text/plain; charset=utf-8',
@@ -132,6 +139,7 @@ function replaceContentPlaceholders(content: string, options: LocalizationOption
     .replace(/\{\{AUTHOR_FAMILY_NAME\}\}/g, authorFamily)
     .replace(/\{\{AUTHOR_SUFFIX\}\}/g, authorSuffix)
     .replace(/\{\{AUTHOR_TITLE\}\}/g, authorSuffix || 'MD')
+    .replace(/\{\{APP_NAME\}\}/g, 'FHIR Test App')
     .replace(/\{\{CURRENT_DATE\}\}/g, currentDate)
     .replace(/\{\{CURRENT_TIME\}\}/g, currentTime)
     .replace(/\{\{CURRENT_TIMESTAMP\}\}/g, currentTimestamp)
@@ -295,7 +303,7 @@ Usage: bun localize-document.ts [options]
 
 Options:
   -t, --type <type>              Document type (required)
-                                 Types: plaintext, pdf, cda, xhtml, html, large, patient-asserted
+                                 Types: consultation, progress, pdf, cda, xhtml, html, large, patient-asserted
   -p, --patient-id <id>          Patient ID (required)
   -s, --server <name>            Server name for output directory (required)
   --patient-name <name>          Patient display name (default: "Test Patient")
@@ -308,6 +316,7 @@ Options:
   -h, --help                     Show this help
 
 Examples:
+  bun localize-document.ts -t consultation -p patient-123 -s smart
   bun localize-document.ts -t pdf -p patient-123 -s smart
   bun localize-document.ts -t html -p abc --patient-name "John Doe" -s epic
   bun localize-document.ts -t cda -p 123 -s smart --author-reference "Practitioner/dr-smith"

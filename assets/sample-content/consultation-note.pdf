@@ -19,7 +19,11 @@ BT
 100 700 Td
 (CONSULTATION NOTE) Tj
 0 -20 Td
-(Date: January 15, 2025) Tj
+(Date: {{CURRENT_DATE}}) Tj
+0 -15 Td
+(Patient: {{PATIENT_NAME}}) Tj
+0 -15 Td
+(Provider: {{AUTHOR_NAME}}) Tj
 0 -30 Td
 (CHIEF COMPLAINT:) Tj
 0 -15 Td

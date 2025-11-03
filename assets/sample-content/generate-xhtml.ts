@@ -28,11 +28,11 @@ function generateXHTML() {
 
     <div class="section">
         <h2>Patient Information</h2>
-        <p><span class="label">Name:</span> [Patient Name]</p>
-        <p><span class="label">MRN:</span> [Medical Record Number]</p>
+        <p><span class="label">Name:</span> {{PATIENT_NAME}}</p>
+        <p><span class="label">MRN:</span> {{PATIENT_ID}}</p>
         <p><span class="label">Date of Birth:</span> [DOB]</p>
         <p><span class="label">Admission Date:</span> January 10, 2025</p>
-        <p><span class="label">Discharge Date:</span> January 15, 2025</p>
+        <p><span class="label">Discharge Date:</span> {{CURRENT_DATE}}</p>
     </div>
 
     <div class="section">
@@ -151,8 +151,8 @@ function generateXHTML() {
 
     <hr/>
     <p>
-        <span class="label">Attending Physician:</span> [Provider Name], MD<br/>
-        <span class="label">Date:</span> January 15, 2025<br/>
+        <span class="label">Attending Physician:</span> {{AUTHOR_NAME}}<br/>
+        <span class="label">Date:</span> {{CURRENT_DATE}}<br/>
         <span class="label">Electronic Signature:</span> [Signature]
     </p>
 </body>
