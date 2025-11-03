@@ -78,9 +78,10 @@ function generateHTML() {
     <h1>Progress Note</h1>
 
     <div class="metadata">
-        <p><strong>Date:</strong> January 15, 2025</p>
-        <p><strong>Time:</strong> 14:30</p>
-        <p><strong>Provider:</strong> [Provider Name], MD</p>
+        <p><strong>Date:</strong> {{CURRENT_DATE}}</p>
+        <p><strong>Time:</strong> {{CURRENT_TIME}}</p>
+        <p><strong>Patient:</strong> {{PATIENT_NAME}}</p>
+        <p><strong>Provider:</strong> {{AUTHOR_NAME}}</p>
         <p><strong>Location:</strong> Cardiology Ward, Room 312</p>
     </div>
 
@@ -191,8 +192,8 @@ function generateHTML() {
     <hr>
 
     <p>
-        <strong>Electronically signed by:</strong> [Provider Name], MD<br>
-        <strong>Date/Time:</strong> January 15, 2025 at 14:45<br>
+        <strong>Electronically signed by:</strong> {{AUTHOR_NAME}}<br>
+        <strong>Date/Time:</strong> {{CURRENT_TIMESTAMP}}<br>
         <strong>Department:</strong> Internal Medicine
     </p>
 </body>

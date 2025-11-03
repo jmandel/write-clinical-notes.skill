@@ -1,9 +1,9 @@
 PROGRESS NOTE
 
-Date: [Current Date]
-Patient: [Patient Name]
-MRN: [Patient ID]
-Provider: [Provider Name]
+Date: {{CURRENT_DATE}}
+Patient: {{PATIENT_NAME}}
+MRN: {{PATIENT_ID}}
+Provider: {{AUTHOR_NAME}}
 
 SUBJECTIVE:
 Patient reports [current symptoms/concerns]. Overall feeling [better/worse/stable] since last visit.
@@ -27,5 +27,5 @@ PLAN:
 4. Patient education provided regarding [topics]
 5. Follow-up appointment scheduled for [date/timeframe]
 
-[Provider Name], [Credentials]
-[Date and Time]
+{{AUTHOR_NAME}}
+{{CURRENT_TIMESTAMP}}

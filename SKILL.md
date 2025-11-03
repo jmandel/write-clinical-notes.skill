@@ -369,7 +369,57 @@ Each template contains placeholders that must be replaced:
 
 ### Localization Process
 
-When localizing templates for a specific server:
+#### Option 1: Use the Localization Script (Recommended)
+
+The easiest way to localize templates is using the provided script:
+
+```bash
+# Basic usage
+bun .claude/skills/fhir-connectathon-notes/assets/lib/localize-document.ts \
+  -t pdf \
+  -p patient-123 \
+  -s smart
+
+# With all options
+bun .claude/skills/fhir-connectathon-notes/assets/lib/localize-document.ts \
+  -t cda \
+  -p patient-123 \
+  -s smart \
+  --patient-name "John Doe" \
+  --author-reference "Practitioner/dr-smith" \
+  --author-display "Dr. Jane Smith"
+```
+
+**Available document types:**
+- `plaintext` - Progress note (text/plain)
+- `pdf` - Consultation note (application/pdf)
+- `cda` - Discharge summary (application/cda+xml) - Proper C-CDA
+- `xhtml` - Discharge summary (application/xhtml+xml) - XHTML rich text
+- `html` - Progress note (text/html)
+- `large` - Large file test (5+ MiB)
+- `patient-asserted` - Patient-authored note with PATAST
+
+**Options:**
+- `-t, --type` - Document type (required)
+- `-p, --patient-id` - Patient ID (required)
+- `-s, --server` - Server name for output directory (required)
+- `--patient-name` - Patient display name (default: "Test Patient")
+- `--author-reference` - Author reference (default: "Practitioner/example")
+- `--author-display` - Author display name (default: "Dr. Example Provider")
+- `--encounter-reference` - Encounter reference (default: "#e1" for contained)
+- `--identifier-system` - Identifier system (default: "https://example.com/fhir-test")
+- `-o, --output-dir` - Custom output directory (default: localized/\<server\>)
+
+The script will:
+1. Generate or read the appropriate content file
+2. Base64 encode it
+3. Replace all template placeholders
+4. Add a contained encounter if using `#e1` reference
+5. Save to `localized/<server>/<type>-note.json`
+
+#### Option 2: Manual Localization
+
+When localizing templates manually for a specific server:
 
 1. **Determine server directory name** from config (e.g., "smart-launcher", "epic-sandbox")
 2. **Create server-specific directory:**

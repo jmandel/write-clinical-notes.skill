@@ -21,7 +21,7 @@
   <!-- Patient -->
   <recordTarget>
     <patientRole>
-      <id root="2.16.840.1.113883.19.5.99999.2" extension="12345"/>
+      <id root="2.16.840.1.113883.19.5.99999.2" extension="{{PATIENT_ID}}"/>
       <addr use="HP">
         <streetAddressLine>1357 Amber Drive</streetAddressLine>
         <city>Portland</city>
@@ -32,8 +32,8 @@
       <telecom value="tel:+1(555)555-1000" use="HP"/>
       <patient>
         <name use="L">
-          <given>Test</given>
-          <family>Patient</family>
+          <given>{{PATIENT_GIVEN_NAME}}</given>
+          <family>{{PATIENT_FAMILY_NAME}}</family>
         </name>
         <administrativeGenderCode code="M" codeSystem="2.16.840.1.113883.5.1" displayName="Male"/>
         <birthTime value="19800801"/>
@@ -45,7 +45,7 @@
 
   <!-- Author -->
   <author>
-    <time value="20250115090000-0500"/>
+    <time value="{{CURRENT_TIMESTAMP_CDA}}"/>
     <assignedAuthor>
       <id root="2.16.840.1.113883.19.5.99999.456" extension="5555555555"/>
       <addr use="WP">
@@ -58,9 +58,9 @@
       <telecom value="tel:+1(555)555-1003" use="WP"/>
       <assignedPerson>
         <name>
-          <given>Jane</given>
-          <family>Provider</family>
-          <suffix>MD</suffix>
+          <given>{{AUTHOR_GIVEN_NAME}}</given>
+          <family>{{AUTHOR_FAMILY_NAME}}</family>
+          <suffix>{{AUTHOR_SUFFIX}}</suffix>
         </name>
       </assignedPerson>
     </assignedAuthor>

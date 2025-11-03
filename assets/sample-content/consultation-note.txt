@@ -1,8 +1,8 @@
 CONSULTATION NOTE
 
-Date: [Current Date]
-Patient: [Patient Name]
-MRN: [Patient ID]
+Date: {{CURRENT_DATE}}
+Patient: {{PATIENT_NAME}}
+MRN: {{PATIENT_ID}}
 
 REASON FOR CONSULTATION:
 Patient referred for evaluation of [condition/symptom].
@@ -32,6 +32,6 @@ RECOMMENDATIONS:
 
 Thank you for this consultation. Please contact me if you have any questions.
 
-[Provider Name]
-[Provider Title]
-[Date and Time]
+{{AUTHOR_NAME}}
+{{AUTHOR_TITLE}}
+{{CURRENT_TIMESTAMP}}
