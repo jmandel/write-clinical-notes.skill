@@ -1,0 +1,7 @@
+# Generated files - these are created by the generate-*.ts scripts
+# and should not be committed to the repository
+consultation-note.pdf
+discharge-summary.cda.xml
+discharge-summary.xhtml
+progress-note.html
+large-note.txt
