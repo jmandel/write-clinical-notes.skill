@@ -114,9 +114,15 @@ debug/
        // Optional: additional headers like "If-None-Exist": "identifier=system|value"
      },
      purpose: "Scenario 1: Basic document creation",
+     configName: "smart-demo-open",  // REQUIRED if multiple configs exist
      callerDir: import.meta.dir  // CRITICAL: Tells library where to write output files
    });
    ```
+
+   **Config Selection Behavior:**
+   - If you have **only one** FHIR config: `configName` is optional (auto-selected)
+   - If you have **multiple** FHIR configs: `configName` is **required** (explicit selection)
+   - The config name matches the filename without `.json` (e.g., `smart-demo-open.json` → `"smart-demo-open"`)
 
 3. **Run from PROJECT ROOT** (not from the debug directory):
    ```bash
@@ -289,6 +295,7 @@ await execute({
   path: "/DocumentReference",
   bodyFile: "localized/smart-demo-open/consultation-note.json",
   purpose: "Scenario 1: Basic document creation",
+  configName: "smart-demo-open",  // REQUIRED if multiple configs exist
   callerDir: import.meta.dir  // CRITICAL: pass the directory to write responses
 });
 EOF
@@ -522,6 +529,7 @@ await execute({
   path: "/DocumentReference",
   bodyFile: "localized/smart-launcher/consultation-note.json",
   purpose: "Scenario 1: Basic document creation",
+  configName: "smart-launcher",  // REQUIRED if multiple configs exist
   callerDir: import.meta.dir
 });
 EOF
@@ -546,6 +554,7 @@ await execute({
   method: "GET",
   path: "/DocumentReference/${DOC_ID}",
   purpose: "Scenario 1: Verify created document",
+  configName: "${SERVER_NAME}",  // REQUIRED if multiple configs exist
   callerDir: import.meta.dir
 });
 EOF
@@ -589,6 +598,7 @@ await execute({
     "If-None-Exist": "identifier=${IDENTIFIER_SYSTEM}|${IDENTIFIER_VALUE}"
   },
   purpose: "Scenario 2: Conditional create (idempotency test)",
+  configName: "${SERVER_NAME}",  // REQUIRED if multiple configs exist
   callerDir: import.meta.dir
 });
 EOF
@@ -608,6 +618,7 @@ await execute({
   method: "GET",
   path: "/DocumentReference?identifier=${IDENTIFIER_SYSTEM}|${IDENTIFIER_VALUE}",
   purpose: "Scenario 2: Verify no duplicate created",
+  configName: "${SERVER_NAME}",  // REQUIRED if multiple configs exist
   callerDir: import.meta.dir
 });
 EOF
@@ -654,6 +665,7 @@ await execute({
   path: "/DocumentReference/${DOC_ID}",
   bodyFile: "debug/${SERVER_NAME}/${TIMESTAMP}-scenario3-correction/update-payload.json",
   purpose: "Scenario 3: Mark document as entered-in-error",
+  configName: "${SERVER_NAME}",  // REQUIRED if multiple configs exist
   callerDir: import.meta.dir
 });
 EOF
@@ -671,6 +683,7 @@ await execute({
   method: "GET",
   path: "/DocumentReference/${DOC_ID}",
   purpose: "Scenario 3: Verify status correction",
+  configName: "${SERVER_NAME}",  // REQUIRED if multiple configs exist
   callerDir: import.meta.dir
 });
 EOF

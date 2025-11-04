@@ -40,23 +40,42 @@ export async function execute(spec: RequestSpec) {
   const configsDir = path.join(projectRoot, '.fhir-configs');
 
   if (spec.configName) {
+    // Explicitly specified config
     const configPath = path.join(configsDir, `${spec.configName}.json`);
+    if (!fs.existsSync(configPath)) {
+      throw new Error(`Config "${spec.configName}" not found at ${configPath}`);
+    }
     config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
   } else {
-    // Use most recently modified config
-    const configs = fs.readdirSync(configsDir)
-      .filter(f => f.endsWith('.json'))
-      .map(f => ({
-        path: path.join(configsDir, f),
-        mtime: fs.statSync(path.join(configsDir, f)).mtime,
-      }))
-      .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+    // No config specified - check how many exist
+    const configFiles = fs.readdirSync(configsDir).filter(f => f.endsWith('.json'));
 
-    if (configs.length === 0) {
-      throw new Error('No FHIR config found');
+    if (configFiles.length === 0) {
+      throw new Error(
+        'No FHIR configs found in .fhir-configs/\n' +
+        'Run the setup script to create a configuration:\n' +
+        '  bun .claude/skills/fhir-connectathon-notes/assets/config/setup.ts'
+      );
     }
 
-    config = JSON.parse(fs.readFileSync(configs[0].path, 'utf-8'));
+    if (configFiles.length > 1) {
+      // Multiple configs exist - require explicit selection
+      const configNames = configFiles.map(f => f.replace('.json', '')).join(', ');
+      throw new Error(
+        `Multiple FHIR configs found: ${configNames}\n` +
+        'Please specify which config to use by adding configName to execute():\n\n' +
+        '  await execute({\n' +
+        '    ...,\n' +
+        '    configName: "your-config-name",\n' +
+        '    ...\n' +
+        '  });\n'
+      );
+    }
+
+    // Exactly one config exists - use it automatically
+    const configPath = path.join(configsDir, configFiles[0]);
+    config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    console.log(`Auto-selected the only available config: ${config.name}`);
   }
 
   console.log(`Using config: ${config.name}`);
