@@ -88,6 +88,26 @@
 
     const CALLBACK_URL = window.location.origin + window.location.pathname;
 
+    // PKCE utility functions
+    function generateRandomString(length) {
+      const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+      let text = '';
+      for (let i = 0; i < length; i++) {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+      }
+      return text;
+    }
+
+    async function generateCodeChallenge(codeVerifier) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(codeVerifier);
+      const digest = await window.crypto.subtle.digest('SHA-256', data);
+      return btoa(String.fromCharCode(...new Uint8Array(digest)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    }
+
     function AuthHelper() {
       const [view, setView] = useState('home'); // 'home', 'new-config', 'config', 'auth', 'complete'
       const [existingConfigs, setExistingConfigs] = useState([]);
@@ -187,6 +207,11 @@
             const state = Math.random().toString(36).substring(7);
             sessionStorage.setItem('oauth_state', state);
 
+            // Generate PKCE parameters
+            const codeVerifier = generateRandomString(128);
+            const codeChallenge = await generateCodeChallenge(codeVerifier);
+            sessionStorage.setItem('pkce_code_verifier', codeVerifier);
+
             const authUrl = new URL(reloadedConfig.authEndpoint);
             authUrl.searchParams.set('response_type', 'code');
             authUrl.searchParams.set('client_id', reloadedConfig.clientId);
@@ -194,6 +219,8 @@
             authUrl.searchParams.set('scope', scope);
             authUrl.searchParams.set('state', state);
             authUrl.searchParams.set('aud', reloadedConfig.fhirBaseUrl);
+            authUrl.searchParams.set('code_challenge', codeChallenge);
+            authUrl.searchParams.set('code_challenge_method', 'S256');
 
             window.location.href = authUrl.toString();
           }
@@ -318,7 +345,7 @@
         }
       };
 
-      const startOAuth = () => {
+      const startOAuth = async () => {
         if (!config.authEndpoint || !config.clientId) {
           setError('Missing authorization endpoint or client ID');
           return;
@@ -327,6 +354,13 @@
         const scope = config.scope || 'patient/DocumentReference.c patient/DocumentReference.u patient/Patient.rs launch/patient';
         const state = Math.random().toString(36).substring(7);
         sessionStorage.setItem('oauth_state', state);
+
+        // Generate PKCE parameters
+        const codeVerifier = generateRandomString(128);
+        const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+        // Store code verifier for later use in token exchange
+        sessionStorage.setItem('pkce_code_verifier', codeVerifier);
 
         // Save entire config to sessionStorage so it survives the redirect
         sessionStorage.setItem('oauth_config', JSON.stringify(config));
@@ -338,6 +372,8 @@
         authUrl.searchParams.set('scope', scope);
         authUrl.searchParams.set('state', state);
         authUrl.searchParams.set('aud', config.fhirBaseUrl);
+        authUrl.searchParams.set('code_challenge', codeChallenge);
+        authUrl.searchParams.set('code_challenge_method', 'S256');
 
         window.location.href = authUrl.toString();
       };
@@ -359,6 +395,12 @@
             client_id: config.clientId,
           });
 
+          // Include PKCE code_verifier
+          const codeVerifier = sessionStorage.getItem('pkce_code_verifier');
+          if (codeVerifier) {
+            body.append('code_verifier', codeVerifier);
+          }
+
           if (config.mode === 'confidential' && config.clientSecret) {
             body.append('client_secret', config.clientSecret);
           }
@@ -377,6 +419,9 @@
           }
 
           const tokenData = await response.json();
+
+          // Clean up PKCE verifier from sessionStorage
+          sessionStorage.removeItem('pkce_code_verifier');
 
           setConfig(prev => ({
             ...prev,
