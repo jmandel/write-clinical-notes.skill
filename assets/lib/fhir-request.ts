@@ -12,12 +12,14 @@ export interface FHIRConfig {
   fhirBaseUrl: string;
   accessToken?: string;
   mode: string;
+  headers?: Record<string, string>;
 }
 
 export interface RequestSpec {
   method: string;
   path: string;
   bodyFile?: string;
+  body?: any; // Direct JSON body (alternative to bodyFile)
   headers?: Record<string, string>;
   purpose: string;
   configName?: string;
@@ -93,9 +95,19 @@ export async function execute(spec: RequestSpec) {
     headers['Authorization'] = `Bearer ${config.accessToken}`;
   }
 
+  // Apply custom headers from config (these will override any previously set headers)
+  if (config.headers) {
+    Object.assign(headers, config.headers);
+  }
+
   // Load request body if specified
   let requestBody: any = null;
-  if (spec.bodyFile) {
+  if (spec.body) {
+    // Direct body provided
+    requestBody = spec.body;
+    headers['Content-Type'] = 'application/fhir+json';
+  } else if (spec.bodyFile) {
+    // Load from file
     const bodyPath = path.isAbsolute(spec.bodyFile)
       ? spec.bodyFile
       : path.join(projectRoot, spec.bodyFile);
@@ -142,6 +154,14 @@ export async function execute(spec: RequestSpec) {
   // Determine output directory - use caller's dir if provided, otherwise CWD
   const outputDir = spec.callerDir || process.cwd();
 
+  // Write request body if present (for debugging/audit trail)
+  if (requestBody) {
+    fs.writeFileSync(
+      path.join(outputDir, 'request-body.json'),
+      JSON.stringify(requestBody, null, 2)
+    );
+  }
+
   fs.writeFileSync(
     path.join(outputDir, 'response-metadata.json'),
     JSON.stringify(responseMetadata, null, 2)
@@ -157,7 +177,12 @@ export async function execute(spec: RequestSpec) {
   console.log(`\n✓ Response saved`);
   console.log(`  Status: ${response.status} ${response.statusText}`);
   console.log(`  Duration: ${responseTime - requestTime}ms`);
-  console.log(`  Files: response-metadata.json, response-body.${responseExt}`);
+
+  const files = ['response-metadata.json', `response-body.${responseExt}`];
+  if (requestBody) {
+    files.unshift('request-body.json');
+  }
+  console.log(`  Files: ${files.join(', ')}`);
 
   if (responseJson?.id) {
     console.log(`  Resource ID: ${responseJson.id}`);

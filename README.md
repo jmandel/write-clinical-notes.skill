@@ -2,7 +2,7 @@
 
 ## What This Skill Does
 
-The `write-clinical-notes.skill` is a comprehensive testing toolkit for the **FHIR Writing Clinical Notes specification**. It helps test DocumentReference write operations at connectathons and in development environments, with support for:
+The `write-clinical-notes` skill is a comprehensive testing toolkit for the **FHIR Writing Clinical Notes specification**. It helps test DocumentReference write operations at connectathons and in development environments, with support for:
 
 - Multiple authentication modes (OAuth, manual tokens, open servers)
 - Document template localization (text/plain, PDF, CDA, XHTML, HTML)
@@ -23,7 +23,7 @@ If you're a Claude agent installing this skill in the current project:
 ```bash
 mkdir -p .claude/skills && \
 cd .claude/skills && \
-git clone https://github.com/jmandel/write-clinical-notes.skill.git && \
+git clone https://github.com/jmandel/write-clinical-notes.skill.git write-clinical-notes && \
 cd ../..
 ```
 
@@ -48,14 +48,14 @@ mkdir -p .claude/skills
 
 ```bash
 cd .claude/skills
-git clone https://github.com/jmandel/write-clinical-notes.skill.git
+git clone https://github.com/jmandel/write-clinical-notes.skill.git write-clinical-notes
 cd ../..
 ```
 
 ### 4. Verify Installation
 
 ```bash
-ls -la .claude/skills/write-clinical-notes.skill
+ls -la .claude/skills/write-clinical-notes
 ```
 
 You should see `SKILL.md` and supporting files (assets/, references/).
@@ -66,7 +66,7 @@ You should see `SKILL.md` and supporting files (assets/, references/).
 your-project/
 ├── .claude/
 │   └── skills/
-│       └── write-clinical-notes.skill/
+│       └── write-clinical-notes/
 │           ├── SKILL.md                    # Main skill documentation
 │           ├── references/                 # Spec and test scenarios
 │           └── assets/                     # Templates, scripts, samples
@@ -89,7 +89,7 @@ No additional commands needed - Claude reads the skill documentation when releva
 The skill includes an interactive setup wizard to configure FHIR server connections:
 
 ```bash
-bun .claude/skills/write-clinical-notes.skill/assets/config/setup.ts
+bun .claude/skills/write-clinical-notes/assets/config/setup.ts
 ```
 
 This launches a web interface at http://localhost:3456 where you can:
@@ -103,7 +103,7 @@ For complete testing workflows, template usage, and test scenarios, refer to the
 ## Updating the Skill
 
 ```bash
-cd .claude/skills/write-clinical-notes.skill
+cd .claude/skills/write-clinical-notes
 git pull origin main
 cd ../../..
 ```
@@ -111,7 +111,7 @@ cd ../../..
 ## Uninstalling
 
 ```bash
-rm -rf .claude/skills/write-clinical-notes.skill
+rm -rf .claude/skills/write-clinical-notes
 ```
 
 ## About Project-Level vs Global Installation

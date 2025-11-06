@@ -186,6 +186,7 @@
           scope: cfg.scope || 'patient/DocumentReference.c patient/DocumentReference.u patient/Patient.rs launch/patient',
           patientId: cfg.patientId,
           encounterRef: cfg.encounterRef,
+          headersJson: cfg.headers ? JSON.stringify(cfg.headers, null, 2) : '{}',
           isReauthorizing: true
         };
 
@@ -249,6 +250,7 @@
           scope: cfg.scope || 'patient/DocumentReference.c patient/DocumentReference.u patient/Patient.rs launch/patient',
           patientId: cfg.patientId,
           encounterRef: cfg.encounterRef,
+          headersJson: cfg.headers ? JSON.stringify(cfg.headers, null, 2) : '{}',
           isFork: true
         });
 
@@ -276,12 +278,26 @@
 
       // Auto-save when config is complete
       useEffect(() => {
-        if (view === 'complete' && config.accessToken && config.name && !saved) {
-          saveConfig();
+        if (view === 'complete' && config.name && !saved) {
+          // For open servers, we don't need an accessToken
+          if (config.mode === 'open' || config.accessToken) {
+            saveConfig();
+          }
         }
-      }, [view, config.accessToken, config.name, saved]);
+      }, [view, config.accessToken, config.name, config.mode, saved]);
 
       const saveConfig = async () => {
+        // Parse headers JSON if provided
+        let headers = undefined;
+        if (config.headersJson && config.headersJson.trim() !== '{}' && config.headersJson.trim() !== '') {
+          try {
+            headers = JSON.parse(config.headersJson);
+          } catch (e) {
+            setError('Invalid JSON in Custom Headers field');
+            return;
+          }
+        }
+
         const exportData = {
           name: config.name,
           fhirBaseUrl: config.fhirBaseUrl,
@@ -295,6 +311,7 @@
           clientId: config.clientId,
           clientSecret: config.clientSecret,
           scope: config.scope,
+          headers: headers,
         };
 
         try {
@@ -736,6 +753,29 @@
             )}
           </div>
 
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Custom Headers (Optional)
+            </label>
+            <textarea
+              value={config.headersJson || '{}'}
+              onChange={(e) => setConfig({ ...config, headersJson: e.target.value })}
+              placeholder='{"Epic-Client-ID": "your-client-id-here"}'
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                fontSize: '14px',
+                fontFamily: 'monospace',
+                minHeight: '80px',
+                borderRadius: '4px',
+                border: '1px solid #ccc'
+              }}
+            />
+            <div style={{ fontSize: '12px', color: '#666', marginTop: '0.25rem' }}>
+              Enter custom HTTP headers as JSON (e.g., for Epic-Client-ID or other vendor-specific headers)
+            </div>
+          </div>
+
           {config.mode === 'open' && (
             <>
               <div style={{ marginBottom: '1rem' }}>
@@ -766,7 +806,6 @@
 
               <button
                 onClick={() => {
-                  setConfig({ ...config, accessToken: 'OPEN_SERVER' });
                   setView('complete');
                 }}
                 disabled={!config.fhirBaseUrl || !config.name}

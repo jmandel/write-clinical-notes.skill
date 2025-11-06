@@ -115,7 +115,14 @@ const server = http.createServer((req, res) => {
         console.log('  FHIR Base URL:', config.fhirBaseUrl);
         console.log('  Mode:', config.mode || 'unknown');
         console.log('  Patient ID:', config.patientId || 'not set');
-        console.log('  Has Access Token:', config.accessToken ? 'Yes' : 'No');
+
+        if (config.mode === 'open') {
+          console.log('  Authentication: Open (no auth required)');
+        } else {
+          console.log('  Has Access Token:', config.accessToken ? 'Yes' : 'No');
+        }
+
+        console.log('  Custom Headers:', config.headers ? JSON.stringify(config.headers) : 'None');
 
         // Output selected config name for agent to read
         console.log('\n📋 SELECTED_CONFIG:', config.name);

@@ -4,8 +4,17 @@
  * Localize a DocumentReference template with patient-specific data
  *
  * Usage:
+ *   # No encounter
  *   bun localize-document.ts --type=pdf --patient-id=123 --server=smart
- *   bun localize-document.ts --type=html --patient-id=abc --patient-name="John Doe" --server=epic
+ *
+ *   # Resolvable encounter
+ *   bun localize-document.ts --type=pdf --patient-id=123 --server=smart \
+ *     --encounter-reference="Encounter/visit-789" --encounter-display="Office Visit"
+ *
+ *   # Contained encounter
+ *   bun localize-document.ts --type=pdf --patient-id=123 --server=smart \
+ *     --encounter-reference="#e1" \
+ *     --encounter-contained='{"resourceType":"Encounter","id":"e1",...}'
  *
  * Available types:
  *   - consultation (plaintext consultation note)
@@ -22,7 +31,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { parseArgs } from 'util';
 
-interface LocalizationOptions {
+export interface LocalizationOptions {
   type: string;
   patientId: string;
   patientName?: string;
@@ -30,9 +39,11 @@ interface LocalizationOptions {
   authorDisplay?: string;
   encounterReference?: string;
   encounterDisplay?: string;
+  encounterContained?: any; // Encounter object or JSON string (CLI passes string, library passes object)
   identifierSystem?: string;
   server: string;
   outputDir?: string;
+  writeToFile?: boolean; // Default true, set false to skip file writing
 }
 
 interface TemplateMapping {
@@ -43,7 +54,7 @@ interface TemplateMapping {
   noteType: string;
 }
 
-const TEMPLATE_MAPPINGS: Record<string, TemplateMapping> = {
+export const TEMPLATE_MAPPINGS: Record<string, TemplateMapping> = {
   consultation: {
     template: 'consultation-note.json',
     contentFile: 'consultation-note.txt',
@@ -108,7 +119,7 @@ function getProjectRoot(): string {
 
 function getSkillRoot(): string {
   const projectRoot = getProjectRoot();
-  return resolve(projectRoot, '.claude/skills/fhir-connectathon-notes');
+  return resolve(projectRoot, '.claude/skills/write-clinical-notes');
 }
 
 function replaceContentPlaceholders(content: string, options: LocalizationOptions): string {
@@ -228,8 +239,6 @@ function localizeTemplate(
   const patientName = options.patientName || 'Test Patient';
   const authorReference = options.authorReference || 'Practitioner/example';
   const authorDisplay = options.authorDisplay || 'Dr. Example Provider';
-  const encounterReference = options.encounterReference || '#e1';
-  const encounterDisplay = options.encounterDisplay || 'Office Visit';
   const identifierSystem = options.identifierSystem || 'https://example.com/fhir-test';
 
   // Replace all placeholders
@@ -240,41 +249,59 @@ function localizeTemplate(
     .replace(/\{\{PATIENT_NAME\}\}/g, patientName)
     .replace(/\{\{AUTHOR_REFERENCE\}\}/g, authorReference)
     .replace(/\{\{AUTHOR_DISPLAY\}\}/g, authorDisplay)
-    .replace(/\{\{ENCOUNTER_REFERENCE\}\}/g, encounterReference)
-    .replace(/\{\{ENCOUNTER_DISPLAY\}\}/g, encounterDisplay)
-    .replace(/\{\{ENCOUNTER_IDENTIFIER_SYSTEM\}\}/g, identifierSystem + '/encounters')
-    .replace(/\{\{ENCOUNTER_IDENTIFIER_VALUE\}\}/g, `enc-${Date.now()}`)
-    .replace(/\{\{ENCOUNTER_START\}\}/g, '2025-01-15T08:00:00Z')
-    .replace(/\{\{ENCOUNTER_END\}\}/g, '2025-01-15T09:00:00Z')
     .replace(/\{\{CURRENT_TIMESTAMP\}\}/g, timestamp)
-    .replace(/\{\{PERIOD_START\}\}/g, '2025-01-15T08:00:00Z')
-    .replace(/\{\{PERIOD_END\}\}/g, '2025-01-15T09:00:00Z')
+    .replace(/\{\{PERIOD_START\}\}/g, timestamp)
+    .replace(/\{\{PERIOD_END\}\}/g, timestamp)
     .replace(/\{\{CONTENT_TYPE\}\}/g, contentType)
     .replace(/\{\{BASE64_CONTENT\}\}/g, base64Content)
     .replace(/\{\{CONTENT_SIZE\}\}/g, contentSize.toString())
     .replace(/\{\{APP_NAME\}\}/g, 'FHIR Test App');
 
+  // Handle encounter-related placeholders
+  if (options.encounterReference) {
+    localized = localized
+      .replace(/\{\{ENCOUNTER_REFERENCE\}\}/g, options.encounterReference)
+      .replace(/\{\{ENCOUNTER_DISPLAY\}\}/g, options.encounterDisplay || 'Encounter');
+  } else {
+    // Remove encounter-related placeholders if no encounter is provided
+    localized = localized
+      .replace(/\{\{ENCOUNTER_REFERENCE\}\}/g, '')
+      .replace(/\{\{ENCOUNTER_DISPLAY\}\}/g, '');
+  }
+
   // Parse to ensure it's valid JSON
   const parsed = JSON.parse(localized);
 
-  // Add contained encounter if using #e1 reference
-  if (encounterReference === '#e1' && !parsed.contained) {
-    parsed.contained = [{
-      resourceType: 'Encounter',
-      id: 'e1',
-      status: 'finished',
-      class: {
-        system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
-        code: 'AMB'
-      },
-      subject: {
-        reference: `Patient/${options.patientId}`
-      },
-      period: {
-        start: '2025-01-15T08:00:00Z',
-        end: '2025-01-15T09:00:00Z'
+  // Remove context.encounter if it's empty (no encounter reference provided)
+  if (!options.encounterReference && parsed.context?.encounter) {
+    // Check if encounter array is empty or contains only empty references
+    const hasValidEncounter = parsed.context.encounter.some(
+      (enc: any) => enc.reference && enc.reference.trim() !== ''
+    );
+    if (!hasValidEncounter) {
+      delete parsed.context.encounter;
+    }
+  }
+
+  // Add contained encounter if provided
+  if (options.encounterContained) {
+    let containedEncounter: any;
+
+    // Handle both object (library use) and string (CLI use)
+    if (typeof options.encounterContained === 'string') {
+      try {
+        containedEncounter = JSON.parse(options.encounterContained);
+      } catch (e) {
+        throw new Error(`Invalid JSON in --encounter-contained: ${e.message}`);
       }
-    }];
+    } else {
+      containedEncounter = options.encounterContained;
+    }
+
+    if (!parsed.contained) {
+      parsed.contained = [];
+    }
+    parsed.contained.push(containedEncounter);
   }
 
   return JSON.stringify(parsed, null, 2);
@@ -290,6 +317,7 @@ async function main() {
       'author-display': { type: 'string' },
       'encounter-reference': { type: 'string' },
       'encounter-display': { type: 'string' },
+      'encounter-contained': { type: 'string' },
       'identifier-system': { type: 'string' },
       server: { type: 'string', short: 's' },
       'output-dir': { type: 'string', short: 'o' },
@@ -309,17 +337,26 @@ Options:
   --patient-name <name>          Patient display name (default: "Test Patient")
   --author-reference <ref>       Author reference (default: "Practitioner/example")
   --author-display <name>        Author display name (default: "Dr. Example Provider")
-  --encounter-reference <ref>    Encounter reference (default: "#e1" for contained)
-  --encounter-display <text>     Encounter display text (default: "Office Visit")
+  --encounter-reference <ref>    Encounter reference (optional - omit to exclude encounter)
+  --encounter-display <text>     Encounter display text (only with --encounter-reference)
+  --encounter-contained <json>   JSON string of contained Encounter (use with --encounter-reference="#id")
   --identifier-system <system>   Identifier system (default: "https://example.com/fhir-test")
   -o, --output-dir <dir>         Output directory (default: localized/<server>)
   -h, --help                     Show this help
 
 Examples:
+  # No encounter reference
   bun localize-document.ts -t consultation -p patient-123 -s smart
-  bun localize-document.ts -t pdf -p patient-123 -s smart
-  bun localize-document.ts -t html -p abc --patient-name "John Doe" -s epic
-  bun localize-document.ts -t cda -p 123 -s smart --author-reference "Practitioner/dr-smith"
+
+  # Resolvable encounter reference
+  bun localize-document.ts -t pdf -p patient-123 -s smart \\
+    --encounter-reference "Encounter/visit-789" \\
+    --encounter-display "Office Visit"
+
+  # Contained encounter
+  bun localize-document.ts -t html -p patient-123 -s epic \\
+    --encounter-reference "#e1" \\
+    --encounter-contained '{"resourceType":"Encounter","id":"e1","status":"finished","class":{"system":"http://terminology.hl7.org/CodeSystem/v3-ActCode","code":"AMB"},"subject":{"reference":"Patient/patient-123"},"period":{"start":"2025-01-15T10:00:00Z","end":"2025-01-15T11:00:00Z"}}'
 `);
     process.exit(0);
   }
@@ -346,6 +383,7 @@ Examples:
     authorDisplay: values['author-display'] as string | undefined,
     encounterReference: values['encounter-reference'] as string | undefined,
     encounterDisplay: values['encounter-display'] as string | undefined,
+    encounterContained: values['encounter-contained'] as string | undefined,
     identifierSystem: values['identifier-system'] as string | undefined,
     server: values.server as string,
     outputDir: values['output-dir'] as string | undefined
@@ -404,6 +442,16 @@ Examples:
     console.log(`    Type: ${mapping.noteType}`);
     console.log(`    Content-Type: ${mapping.contentType}`);
     console.log(`    Patient: ${options.patientId}`);
+
+    if (options.encounterReference) {
+      console.log(`    Encounter: ${options.encounterReference}`);
+      if (options.encounterContained) {
+        console.log(`    Contained Encounter: Yes`);
+      }
+    } else {
+      console.log(`    Encounter: Not included`);
+    }
+
     console.log(`    Size: ${contentSize} bytes (${(contentSize / 1024).toFixed(2)} KB)`);
     console.log(`    Base64 length: ${base64Content.length} chars`);
 
@@ -413,4 +461,80 @@ Examples:
   }
 }
 
-main();
+/**
+ * High-level API for programmatic use
+ *
+ * Example:
+ * ```typescript
+ * import { localizeDocumentReference } from './localize-document.ts';
+ *
+ * const docRef = await localizeDocumentReference({
+ *   type: 'consultation',
+ *   patientId: 'patient-123',
+ *   server: 'smart',
+ *   encounterReference: 'Encounter/visit-789',
+ *   writeToFile: false
+ * });
+ *
+ * // docRef is the DocumentReference JSON object, ready to POST
+ * ```
+ */
+export async function localizeDocumentReference(
+  options: LocalizationOptions
+): Promise<any> {
+  const projectRoot = getProjectRoot();
+  const skillRoot = getSkillRoot();
+
+  const mapping = TEMPLATE_MAPPINGS[options.type];
+  if (!mapping) {
+    throw new Error(`Unknown document type: ${options.type}. Available: ${Object.keys(TEMPLATE_MAPPINGS).join(', ')}`);
+  }
+
+  // Get or generate content
+  let contentData: { content: Buffer; filename: string };
+  if (mapping.contentGenerator) {
+    contentData = await generateContent(mapping.contentGenerator, options);
+  } else if (mapping.contentFile) {
+    contentData = getContentFile(mapping.contentFile, options);
+  } else {
+    throw new Error('No content source specified in mapping');
+  }
+
+  // Base64 encode content
+  const base64Content = contentData.content.toString('base64');
+  const contentSize = contentData.content.length;
+
+  // Read and localize template
+  const templatePath = resolve(skillRoot, 'assets/templates', mapping.template);
+  const templateContent = readFileSync(templatePath, 'utf-8');
+
+  const localizedJson = localizeTemplate(
+    templateContent,
+    options,
+    base64Content,
+    contentSize,
+    mapping.contentType
+  );
+
+  // Parse the JSON for return
+  const parsedJson = JSON.parse(localizedJson);
+
+  // Optionally write to file (default true for CLI, typically false for library use)
+  if (options.writeToFile !== false) {
+    const outputDir = options.outputDir || resolve(projectRoot, 'localized', options.server);
+    mkdirSync(outputDir, { recursive: true });
+
+    const outputFilename = `${options.type}-note.json`;
+    const outputPath = resolve(outputDir, outputFilename);
+
+    writeFileSync(outputPath, localizedJson);
+  }
+
+  // Return the DocumentReference object directly
+  return parsedJson;
+}
+
+// Only run main() if this is the entry point (not imported as a library)
+if (import.meta.main) {
+  main();
+}
